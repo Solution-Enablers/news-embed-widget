@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Portal</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* A slightly off-white for a softer look */
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .card-hover {
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        /* Style for the dropdown */
+        #feed-selector {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.4-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right .7em top 50%;
+            background-size: .65em auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 md:mb-12 pb-4 border-b border-gray-200">
+            <h1 id="portal-title" class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 md:mb-0">News Portal</h1>
+            <div class="relative">
+                <select id="feed-selector" class="bg-white border border-gray-300 text-gray-700 font-semibold py-2 px-4 pr-8 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="nyt">The New York Times</option>
+                    <option value="toi">The Times of India</option>
+                </select>
+            </div>
+        </header>
+        <p id="last-updated" class="text-center text-gray-500 -mt-8 mb-8">Latest Headlines</p>
+
+        <!-- Main Content: Will be populated by JavaScript -->
+        <main id="news-container">
+            <!-- Loading State -->
+            <div id="loading" class="text-center">
+                 <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                    <span class="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
+                </div>
+                <p class="mt-2 text-lg text-gray-600">Fetching the latest stories...</p>
+            </div>
+            
+            <!-- Error State -->
+            <div id="error" class="hidden text-center bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
+                <strong class="font-bold">Error:</strong>
+                <span class="block sm:inline" id="error-message">Something went wrong while fetching the news.</span>
+            </div>
+
+            <!-- News Content -->
+            <div id="featured-article" class="mb-8 md:mb-12"></div>
+            <div id="articles-grid" class="grid gap-8 md:grid-cols-2 lg:grid-cols-3"></div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center mt-12 py-4 border-t border-gray-200">
+            <p id="footer-text" class="text-gray-500">Powered by The New York Times RSS Feed</p>
+        </footer>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Configuration for the available RSS feeds
+            const feeds = {
+                nyt: {
+                    name: 'The New York Times',
+                    url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml'
+                },
+                toi: {
+                    name: 'The Times of India',
+                    url: 'https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms'
+                }
+            };
+            
+            // DOM element references
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const errorMessageEl = document.getElementById('error-message');
+            const featuredArticleEl = document.getElementById('featured-article');
+            const articlesGridEl = document.getElementById('articles-grid');
+            const lastUpdatedEl = document.getElementById('last-updated');
+            const feedSelectorEl = document.getElementById('feed-selector');
+            const portalTitleEl = document.getElementById('portal-title');
+            const footerTextEl = document.getElementById('footer-text');
+
+            /**
+             * Fetches and displays the news from the selected RSS feed.
+             * @param {string} feedKey - The key for the selected feed (e.g., 'nyt' or 'toi').
+             */
+            async function fetchNews(feedKey) {
+                clearContent();
+                loadingEl.classList.remove('hidden');
+
+                const feed = feeds[feedKey];
+                portalTitleEl.textContent = feed.name;
+                footerTextEl.textContent = `Powered by ${feed.name} RSS Feed`;
+                
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
+
+                try {
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok, status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    parseAndDisplayFeed(data.contents, feedKey);
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    showErrorState(`Failed to retrieve news feed. Please try again later. Details: ${error.message}`);
+                } finally {
+                    loadingEl.classList.add('hidden');
+                }
+            }
+            
+            /**
+             * Parses the XML string and renders the news items into the DOM.
+             * @param {string} xmlString - The RSS feed content as an XML string.
+             * @param {string} feedKey - The key for the currently selected feed.
+             */
+            function parseAndDisplayFeed(xmlString, feedKey) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlString, 'application/xml');
+                
+                const parseError = xmlDoc.querySelector('parsererror');
+                if (parseError) {
+                    console.error('XML Parsing Error:', parseError);
+                    showErrorState('Failed to parse the news feed.');
+                    return;
+                }
+
+                const lastBuildDate = xmlDoc.querySelector('lastBuildDate');
+                if (lastBuildDate) {
+                    lastUpdatedEl.textContent = `Last Updated: ${new Date(lastBuildDate.textContent).toLocaleString()}`;
+                }
+
+                const items = Array.from(xmlDoc.querySelectorAll('item'));
+                if (items.length === 0) {
+                    showErrorState('No news articles found in the feed.');
+                    return;
+                }
+
+                const [featuredItem, ...otherItems] = items;
+                
+                displayFeaturedArticle(featuredItem, feedKey);
+                displayArticleGrid(otherItems, feedKey);
+            }
+
+            /**
+             * Creates and displays the featured article.
+             * @param {Element} item - The XML element for the featured article.
+             * @param {string} feedKey - The key for the currently selected feed.
+             */
+            function displayFeaturedArticle(item, feedKey) {
+                const articleData = parseItem(item, feedKey);
+                if (!articleData) return;
+
+                featuredArticleEl.innerHTML = `
+                    <div class="card-hover bg-white rounded-xl shadow-lg overflow-hidden md:flex">
+                        <div class="md:w-1/2">
+                            <img class="h-64 w-full object-cover md:h-full" src="${articleData.imageUrl}" alt="${articleData.title}" onerror="this.onerror=null;this.src='https://placehold.co/800x600/e2e8f0/4a5568?text=Image+Not+Found';">
+                        </div>
+                        <div class="p-8 md:w-1/2 flex flex-col justify-center">
+                             <p class="text-sm text-gray-500 mb-2">${articleData.pubDate}</p>
+                            <h2 class="text-2xl lg:text-3xl font-bold text-gray-900 mb-4">${articleData.title}</h2>
+                            <p class="text-gray-600 mb-6">${articleData.description}</p>
+                            <a href="${articleData.link}" target="_blank" rel="noopener noreferrer" class="self-start inline-block bg-gray-800 text-white font-semibold py-2 px-5 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                                Read Full Story &rarr;
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
+
+            /**
+             * Creates and displays the grid of other articles.
+             * @param {Element[]} items - An array of XML elements for the articles.
+             * @param {string} feedKey - The key for the currently selected feed.
+             */
+            function displayArticleGrid(items, feedKey) {
+                let articlesHtml = '';
+                items.forEach(item => {
+                    const articleData = parseItem(item, feedKey);
+                    if (!articleData) return;
+
+                    articlesHtml += `
+                        <div class="card-hover bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
+                            <a href="${articleData.link}" target="_blank" rel="noopener noreferrer">
+                                <img class="h-48 w-full object-cover" src="${articleData.imageUrl}" alt="${articleData.title}" onerror="this.onerror=null;this.src='https://placehold.co/600x400/e2e8f0/4a5568?text=Image';">
+                            </a>
+                            <div class="p-6 flex-grow flex flex-col">
+                                <p class="text-sm text-gray-500 mb-2">${articleData.pubDate}</p>
+                                <h3 class="text-xl font-semibold text-gray-900 mb-3 flex-grow">
+                                    <a href="${articleData.link}" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600">${articleData.title}</a>
+                                </h3>
+                                <p class="text-gray-600 text-sm">${articleData.description}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                articlesGridEl.innerHTML = articlesHtml;
+            }
+
+            /**
+             * Parses a single <item> element from an RSS feed, handling different feed structures.
+             * @param {Element} item - The XML <item> element.
+             * @param {string} feedKey - The key for the currently selected feed.
+             * @returns {object|null} An object with article data or null if invalid.
+             */
+            function parseItem(item, feedKey) {
+                const title = item.querySelector('title')?.textContent || 'No Title';
+                const link = item.querySelector('link')?.textContent || '#';
+                const pubDateStr = item.querySelector('pubDate')?.textContent;
+                const pubDate = pubDateStr ? new Date(pubDateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No Date';
+
+                let description = '';
+                let imageUrl = 'https://placehold.co/600x400/e2e8f0/4a5568?text=No+Image';
+
+                if (feedKey === 'nyt') {
+                    description = item.querySelector('description')?.textContent || '';
+                    const mediaContent = item.querySelector('media\\:content, content');
+                    if (mediaContent && mediaContent.getAttribute('url')) {
+                        imageUrl = mediaContent.getAttribute('url');
+                    }
+                } else if (feedKey === 'toi') {
+                    const descriptionHTML = item.querySelector('description')?.textContent || '';
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = descriptionHTML;
+                    
+                    const imgTag = tempDiv.querySelector('img');
+                    if (imgTag && imgTag.src) {
+                        imageUrl = imgTag.src;
+                    }
+                    description = tempDiv.textContent || '';
+                }
+
+                return { title, link, description, pubDate, imageUrl };
+            }
+
+            /** Shows the error message container. */
+            function showErrorState(message) {
+                errorMessageEl.textContent = message;
+                errorEl.classList.remove('hidden');
+                loadingEl.classList.add('hidden');
+                featuredArticleEl.classList.add('hidden');
+                articlesGridEl.classList.add('hidden');
+            }
+            
+            /** Clears existing news content and errors from the DOM. */
+            function clearContent() {
+                featuredArticleEl.innerHTML = '';
+                articlesGridEl.innerHTML = '';
+                errorEl.classList.add('hidden');
+            }
+            
+            // Event listener for the feed selector dropdown
+            feedSelectorEl.addEventListener('change', (event) => {
+                fetchNews(event.target.value);
+            });
+
+            // Initial call to fetch news with the default selection
+            fetchNews(feedSelectorEl.value);
+        });
+    </script>
+
+</body>
+</html>
